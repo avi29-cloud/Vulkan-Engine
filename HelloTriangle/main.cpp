@@ -5,8 +5,9 @@
 #include<cstdlib>
 #include<vector>
 #include<cstring>
+#include<map>
 
-VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkallocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger){
+VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger){
     auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
 
     if (func != nullptr){
@@ -17,7 +18,7 @@ VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMes
     }
 }
 void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator ){
-    auto func =(PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProAddr(instance,"vkDestroyDebugUtilsMessengerEXT");
+    auto func =(PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance,"vkDestroyDebugUtilsMessengerEXT");
     if (func != nullptr){
         func(instance, debugMessenger, pAllocator);
     }
@@ -46,6 +47,7 @@ class HelloTriangleApplication {
      GLFWwindow*window;
      VkInstance instance;
       VkDebugUtilsMessengerEXT debugMessenger;
+      VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     void initWindow(){
         if (!glfwInit()) {
             throw std::runtime_error("Failed to initialize GLFW!");}
@@ -62,24 +64,90 @@ class HelloTriangleApplication {
     void initVulkan(){
         createInstance();
         setupDebugMessenger();
+        pickPhysicalDevice();
 
     }
+   /* void pickPhysicalDevice(){
+        uint32_t deviceCount = 0;
+        std::multimap<int, VkPhysicalDevice> candidates;
+        for(const auto& device : devices){
+            int score = rateDeviceSuitability(device);
+            candidates.insert(std::make_pair(score, device));
+        }
+        if ( candidates.rbegin()->first > 0){
+            physicalDevice = candidates.rbegin()->second;
+        }
+        else{
+            throw std::runtime_error("failed to find a suitable GPU!");
+        }
+       vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+        if (deviceCount ==0){
+            throw std::runtime_error("failed to find GPUs with Vulkan support");
+        }
+        std::vector<VkPhysicalDevice> devices(deviceCount);
+        vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+          for (const auto& device : devices){
+            if (isDeviceSuitable(device)){
+                physicalDevice = device;
+                break;
+            }
+        }
+        if (physicalDevice == VK_NULL_HANDLE){
+            throw std::runtime_error("failed to find any suitable Gpu!");
+        }
+    }
+   int rateDeviceSuitability(VkPhysicalDevice device){
+         int score = 0;
+          if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU){
+               score+= 1000;//because discrete gpu have performance advantage
+        }
+      score += deviceProperties.limits.maxImageDimensions2D;//maximum possible size of textures affects graphics quality
+       if (!deviceFeatures.geometryShader){
+           return 0;
+       }
+            return score;
+    } */  //This is a robust way to pick a GPU using a scoring system. It checks 
+                            // device properties and favors dedicated graphics cards (Discrete GPUs) 
+                            // over integrated graphics, while also checking maximum texture sizes.
+    
+    /*bool isDeviceSuitable(VkPhysicalDevice device){
+        VkPhysicalDeviceProperties deviceProperties;
+        vkGetPhysicalDeviceProperties(device, &deviceProperties);
+        VkPhysicalDeviceFeatures deviceFeatures;
+        vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+      
+        return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
+               deviceFeatures.geometryShader;
+
+    }*/
+
+    void pickPhysicalDevice(){
+    uint32_t deviceCount =0;
+    vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+    if (deviceCount ==0){
+        throw std::runtime_error("failed to find gpus with Vulkan support!");
+    }
+    std::vector<VkPhysicalDevice> devices(deviceCount);
+    vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+    for( const auto& device : devices){
+        if (isDeviceSuitable(device)){
+            physicalDevice = device;
+            break;
+        }
+    }
+    if (physicalDevice == VK_NULL_HANDLE){
+        throw std::runtime_error("failed to find a suitable GPU!");
+    }
+ }
+ bool isDeviceSuitable(VkPhysicalDevice device){
+    return true; // this because right now any gpu is fine
+    //the tutorial was teaching the ways for gpu selection for AAA games which I commented out
+ }
     void setupDebugMessenger(){
-        if(!enableValidationLayers)  return;
-       VkDebugUtilsMessengerCreateInfoEXT createInfo{};
-       createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-       createInfo.messageSeverity=VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-                                   //tells vulkan which severity we want to hear about
-     createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                              VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                              VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-                                  //this tells vulkan what type of message we want
-
-      createInfo.pfnUserCallback = debugCallback;
-      create.pUserData = nullptr;                            
-
+     if(!enableValidationLayers)  return;
+       VkDebugUtilsMessengerCreateInfoEXT createInfo;
+       populateDebugMessengerCreateInfo(createInfo);//this does all the work of the previous code
+      
       if (CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger)!= VK_SUCCESS){
         throw std::runtime_error("failed to set up debug messenger!");
       }
@@ -130,7 +198,18 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
        
         return VK_FALSE;
     }
-
+ void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo){
+    createInfo ={};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT|
+                                VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT|
+                                VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT|
+                            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT|
+                            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    createInfo.pfnUserCallback=debugCallback;
+    createInfo.pUserData = nullptr;                                                        
+ }
     
     void createInstance(){
 
@@ -149,13 +228,17 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         VkInstanceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         createInfo.pApplicationInfo = &appInfo;
+
+        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
         if (enableValidationLayers){
             createInfo.enabledLayerCount =static_cast<uint32_t>(validationLayers.size());
             createInfo.ppEnabledLayerNames = validationLayers.data();
-
+             populateDebugMessengerCreateInfo(debugCreateInfo);
+             createInfo.pNext =(VkDebugUtilsMessengerCreateInfoEXT*) &debugCreateInfo;
         }
         else{
             createInfo.enabledLayerCount =0;
+            createInfo.pNext = nullptr;
         }
 
        auto extensions = getRequiredExtensions();
