@@ -12,6 +12,7 @@
 #include<algorithm>
 #include<limits>
 #include<cstdint>
+#include<fstream>
 
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger){
     auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
@@ -79,6 +80,40 @@ class HelloTriangleApplication {
         std::vector<VkSurfaceFormatKHR> formats;
         std::vector<VkPresentModeKHR> presentModes;
      };
+     static std::vector<char> readFile(const std::string& filename){
+        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+        //binary means read it as raw data , not as text
+        //ate means start at the End of the file (so we know its size immediately)
+        if (!file.is_open()){
+            throw std::runtime_error("failed to open file");
+        }
+        size_t fileSize = (size_t) file.tellg();
+        std::vector<char> buffer(fileSize);
+
+        file.seekg(0);// Jump back to the beginning of the file and read it all at once
+        file.read(buffer.data(), fileSize);
+        file.close();
+
+        return buffer;
+
+
+     }
+
+     VkShaderModule createShaderModule(const std::vector<char>& code){
+        VkShaderModuleCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        createInfo.codeSize = code.size();
+
+        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+        VkShaderModule shaderModule;
+
+        if (vkCreateShaderModule(device, &createInfo,nullptr, &shaderModule) != VK_SUCCESS){
+            throw std::runtime_error("failed to create shader Module");
+
+        }
+        return shaderModule;
+     }
     void initWindow(){
         if (!glfwInit()) {
             throw std::runtime_error("Failed to initialize GLFW!");}
@@ -100,8 +135,10 @@ class HelloTriangleApplication {
         createLogicalDevice();
         createSwapChain();
         createImageViews();
+        createGraphicsPipeline();
 
     }
+
    /* void pickPhysicalDevice(){
         uint32_t deviceCount = 0;
         std::multimap<int, VkPhysicalDevice> candidates;
@@ -421,6 +458,34 @@ void createImageViews(){
         }
     }
 }
+
+void createGraphicsPipeline(){
+
+    auto vertshaderCode = readFile("vert.spv");
+    auto fragshaderCode = readFile("frag.spv");
+
+    VkShaderModule vertShaderModule = createShaderModule(vertshaderCode);
+    VkShaderModule fragShaderModule = createShaderModule(fragshaderCode);
+
+    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};// configure the vertex shader stage
+    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage= VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageInfo.module =vertShaderModule;
+    vertShaderStageInfo.pName ="main";// tell Vulkan which function to run inside the shader
+
+   VkPipelineShaderStageCreateInfo fragShaderStageInfo{};// configure the fragment shader stage
+    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage= VK_SHADER_STAGE_FRAGMENT_BIT;
+    vertShaderStageInfo.module =fragShaderModule;
+    vertShaderStageInfo.pName ="main";
+
+    VkPipelineShaderStageCreateInfo shaderStages[] ={vertShaderStageInfo,fragShaderStageInfo};
+
+    vkDestroyShaderModule(device, fragShaderModule, nullptr);
+    vkDestroyShaderModule(device, vertShaderModule, nullptr);
+
+}
+
     void setupDebugMessenger(){
      if(!enableValidationLayers)  return;
        VkDebugUtilsMessengerCreateInfoEXT createInfo;
