@@ -69,7 +69,8 @@ class HelloTriangleApplication {
       VkExtent2D swapChainExtent;
       std::vector<VkImageView> swapChainImageViews;
       VkPipelineLayout pipelineLayout; 
-
+      VkRenderPass renderPass;
+      VkPipeline graphicsPipeline;
      struct QueueFamilyIndices{
         std::optional<uint32_t> graphicsFamily;
         std::optional<uint32_t> presentFamily;
@@ -137,6 +138,7 @@ class HelloTriangleApplication {
         createLogicalDevice();
         createSwapChain();
         createImageViews();
+        createRenderPass();
         createGraphicsPipeline();
 
     }
@@ -194,6 +196,7 @@ class HelloTriangleApplication {
                deviceFeatures.geometryShader;
 
     }*/
+
     void createSurface(){
         if (glfwCreateWindowSurface(instance, window, nullptr,&surface)!= VK_SUCCESS){
             throw std::runtime_error("failed to create a window surfce");
@@ -460,6 +463,40 @@ void createImageViews(){
         }
     }
 }
+void createRenderPass(){
+        VkAttachmentDescription colorAttachment{};//whiteboard manager
+        colorAttachment.format = swapChainImageFormat;
+        colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; //wipe it clean before drawing
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;//save it in memory
+        colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorAttachment.stencilStoreOp =VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        //The subpass reference( tells the pipeline where to find the whigteboard)
+        VkAttachmentReference colorAttachmentRef{};
+        colorAttachmentRef.attachment = 0; //the index of the attachment array
+        colorAttachmentRef.layout =VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        // The Subpass (A render pass can have multiple steps; we just need one)
+        VkSubpassDescription subpass{};
+        subpass.pipelineBindPoint =VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount =1;
+        subpass.pColorAttachments = &colorAttachmentRef;
+
+        //create actual render pass object
+        VkRenderPassCreateInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassInfo.attachmentCount = 1;
+        renderPassInfo.pAttachments = &colorAttachment;
+        renderPassInfo.subpassCount =1;
+        renderPassInfo.pSubpasses = &subpass;
+
+        if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass)!= VK_SUCCESS){
+            throw std::runtime_error("failed to create render pass!");
+        }
+    }
 
 void createGraphicsPipeline(){
 
@@ -562,11 +599,44 @@ void createGraphicsPipeline(){
    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
    pipelineLayoutInfo.setLayoutCount = 0;
    pipelineLayoutInfo.pushConstantRangeCount = 0;
+   pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
 
    if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr , &pipelineLayout)!= VK_SUCCESS){
     throw std::runtime_error("failed to create pipeline layout!");
    }
+
+  VkGraphicsPipelineCreateInfo  pipelineInfo{};
+  pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+
+  //Programmable Shaders
+  pipelineInfo.stageCount =2;
+  pipelineInfo.pStages = shaderStages;
+
+  // fixed function States
+ pipelineInfo.pVertexInputState = &vertexInputInfo;
+ pipelineInfo.pInputAssemblyState =&inputAssembly;
+ pipelineInfo.pViewportState = &viewportState;
+ pipelineInfo.pRasterizationState = &rasterizer;
+ pipelineInfo.pMultisampleState =&multisampling;
+ pipelineInfo.pDepthStencilState = nullptr;
+ pipelineInfo.pColorBlendState = &colorBlending; 
+ pipelineInfo.pDynamicState = &dynamicState;
+
+ //pipeline layout
+ pipelineInfo.layout = pipelineLayout;
+
+// render pass
+pipelineInfo.renderPass = renderPass;
+pipelineInfo.subpass =0; //the index of subpass we created
+
+//optimization
+pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+pipelineInfo.basePipelineIndex =-1;
+
+if (vkCreateGraphicsPipelines(device ,VK_NULL_HANDLE,1,&pipelineInfo,nullptr,&graphicsPipeline)!= VK_SUCCESS){
+    throw std::runtime_error("failed to create graphics pipeline!");
+}
     vkDestroyShaderModule(device, fragShaderModule, nullptr);
     vkDestroyShaderModule(device, vertShaderModule, nullptr);
 
@@ -706,7 +776,9 @@ void createInstance(){
         for(auto imageView : swapChainImageViews){
             vkDestroyImageView(device, imageView, nullptr);
         }
+        vkDestroyPipeline(device, graphicsPipeline,nullptr);
         vkDestroyPipelineLayout(device , pipelineLayout, nullptr);
+        vkDestroyRenderPass(device, renderPass, nullptr);
         vkDestroySwapchainKHR(device, swapChain, nullptr);
         vkDestroyDevice(device, nullptr);
         if (enableValidationLayers){
