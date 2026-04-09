@@ -189,6 +189,7 @@ class HelloTriangleApplication {
         createRenderPass();
         createGraphicsPipeline();
         createFramebuffers();
+        createVertexBuffer();
         createCommandPool();
         createCommandBuffer();
         createSyncObjects();
@@ -728,7 +729,40 @@ uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties){
             return i;
         }
     }
-    throw std::runtime_error("failed to find suitable memory type ")
+    throw std::runtime_error("failed to find suitable memory type ");
+
+void createVertexBuffer(){
+    VkDeviceSize bufferSize = sizeof(vertices[0])* vertices.size();
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = bufferSize;
+    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(device, &bufferInfo ,nullptr ,&vertexBuffer )!= VK_SUCCESS){
+        throw std::runtime_error("failed to create vertex buffer");
+
+    }
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(device , vertexBuffer , &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    alloc.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    if(vkAllocateMemory(device, &allocInfo, nullptr , &vertexBufferMemory)!= VK_SUCCESS){
+        throw std::runtime_error("failed to allocate vertex buffer memory");
+
+    }
+
+    vkBindBufferMemory (device, vertexBuffer, vertexBufferMemory, 0);
+
+    void* data;
+    vkMapMemory(device , vertexBufferMemory , 0, bufferSize , 0,&data);
+      memcpy(data, vertices.data(),(size_t)bufferSize);
+    vkUnmapMemory(device,vertexBufferMemory);  
+}    
 }
  void createCommandPool(){
     QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
@@ -787,6 +821,9 @@ uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties){
     //Bind our Graphics Pipeline
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS , graphicsPipeline);
 
+    VkBuffer vertexBuffers[] = {vertexBuffer};
+    VkDeviceSize offset[] = {0};
+    vkCmdBindVertexBuffers(commandBuffer, 0 , 1 , vertexBuffers, offsets);
     //Dynamic States
     VkViewport viewport{};
     viewport.x = 0.0f;
@@ -1025,6 +1062,8 @@ void createInstance(){
         for(auto imageView : swapChainImageViews){
             vkDestroyImageView(device, imageView, nullptr);
         }
+        vkDestroyBuffer(device, vertexBuffer , nullptr);
+        vkFreeMemory(device , vertexBufferMemory, nullptr);
         vkDestroyPipeline(device, graphicsPipeline,nullptr);
         vkDestroyPipelineLayout(device , pipelineLayout, nullptr);
         vkDestroyRenderPass(device, renderPass, nullptr);
