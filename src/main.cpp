@@ -84,7 +84,7 @@ struct UniformBufferObject {
     glm::mat4 view;
     glm::mat4 proj;
 };
-class HelloTriangleApplication {
+class Application {
     public:
     const uint32_t WIDTH =800;
     const uint32_t HEIGHT = 600;
@@ -1239,7 +1239,7 @@ void createInstance(){
 
 
 int main(){
-    HelloTriangleApplication app;
+    Application app;
  try {
     app.run();
 
