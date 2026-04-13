@@ -2,6 +2,10 @@
 #include <glm/glm.hpp>
 #include<array>
 #include <GLFW/glfw3.h>
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/gtc/matrix_transform.hpp>
+#include <chrono>  //for keeping track of time
 #include<iostream>
 #include<stdexcept>
 #include<cstdlib>
@@ -75,6 +79,11 @@ const std::vector<uint16_t> indices = {
     0,1,2, 
     2,3,0
 };
+struct UniformBufferObject {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+};
 class HelloTriangleApplication {
     public:
     const uint32_t WIDTH =800;
@@ -113,7 +122,8 @@ class HelloTriangleApplication {
       VkFormat swapChainImageFormat;
       VkExtent2D swapChainExtent;
       std::vector<VkImageView> swapChainImageViews;
-      VkPipelineLayout pipelineLayout; 
+      VkPipelineLayout pipelineLayout;
+      VkDescriptorSetLayout descriptorSetLayout; 
       VkRenderPass renderPass;
       VkPipeline graphicsPipeline;
       std::vector<VkFramebuffer> swapChainFramebuffers;
@@ -124,7 +134,6 @@ class HelloTriangleApplication {
       VkFence inFlightFence;
       VkBuffer vertexBuffer;
       VkDeviceMemory vertexBufferMemory;
-
       VkBuffer indexBuffer;
       VkDeviceMemory indexBufferMemory;
 
@@ -196,6 +205,7 @@ class HelloTriangleApplication {
         createSwapChain();
         createImageViews();
         createRenderPass();
+        createDescriptorSetLayout();
         createGraphicsPipeline();
         createFramebuffers();
         createCommandPool();
@@ -526,6 +536,26 @@ void createImageViews(){
         }
     }
 }
+void createDescriptorSetLayout(){
+    VkDescriptorSetLayoutBinding uboLayoutBinding{};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+
+    //only need this math in the vertex shader not the fragment shader
+
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uboLayoutBinding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &uboLayoutBinding;
+
+    if (vkCreateDescriptorSetLayout(device , &layoutInfo , nullptr , &descriptorSetLayout) != VK_SUCCESS){
+        throw std::runtime_error("failed to create descriptor set layout !");
+    }
+}
 void createRenderPass(){
         VkAttachmentDescription colorAttachment{};//whiteboard manager
         colorAttachment.format = swapChainImageFormat;
@@ -663,7 +693,8 @@ void createGraphicsPipeline(){
    //Pipeline Layout (for passing global variable to the shaders later)
    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-   pipelineLayoutInfo.setLayoutCount = 0;
+   pipelineLayoutInfo.setLayoutCount = 1; //changed to 1 after the descriptor set layout function
+   pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
    pipelineLayoutInfo.pushConstantRangeCount = 0;
    pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
@@ -1189,6 +1220,7 @@ void createInstance(){
         vkFreeMemory(device , indexBufferMemory, nullptr);
         vkFreeMemory(device , vertexBufferMemory, nullptr);
         vkDestroyPipeline(device, graphicsPipeline,nullptr);
+        vkDestroyDescriptorSetLayout(device , descriptorSetLayout , nullptr);
         vkDestroyPipelineLayout(device , pipelineLayout, nullptr);
         vkDestroyRenderPass(device, renderPass, nullptr);
         vkDestroySwapchainKHR(device, swapChain, nullptr);
