@@ -123,7 +123,11 @@ class Application {
       VkExtent2D swapChainExtent;
       std::vector<VkImageView> swapChainImageViews;
       VkPipelineLayout pipelineLayout;
-      VkDescriptorSetLayout descriptorSetLayout; 
+      std::vector<VkBuffer> unformBuffers;
+      std::vector<VkDeviceMemory> UniformBufferMemory;
+      std::vector<void*> uniformBuffersMapped;
+      VkDescriptorSetLayout descriptorSetLayout;
+      std::vector<VkDescriptorSet> descriptorSets; 
       VkRenderPass renderPass;
       VkPipeline graphicsPipeline;
       std::vector<VkFramebuffer> swapChainFramebuffers;
@@ -912,6 +916,18 @@ void createIndexBuffer(){
 
     vkDestroyBuffer(device , stagingBuffer , nullptr);
     vkFreeMemory(device , stagingBufferMemory , nullptr);
+}
+
+void createUniformBuffers(){
+    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+    uniformBuffersMemory.resize(swapChainImages.size());
+    uniformBuffersMapped.resize(swapChainImages.size()); 
+
+    for (size_t i = 0; i<swapChainImages.size(); i++){
+        createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT ,VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT , unifromBuffers[i], uniformBuffersMemory[i]);
+
+        vkMapMemory(device , uniformBuffersMemory[i], 0 , bufferSize , 0 , &uniformBuffersMapped[i]);
+    }
 }
 
  void createCommandPool(){
