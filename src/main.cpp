@@ -5,6 +5,8 @@
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/gtc/matrix_transform.hpp>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 #include <chrono>  //for keeping track of time
 #include<iostream>
 #include<stdexcept>
@@ -129,6 +131,8 @@ class Application {
       std::vector<void*> uniformBuffersMapped;
       VkDescriptorSetLayout descriptorSetLayout;
       std::vector<VkDescriptorSet> descriptorSets; 
+      VkImage textureImage;
+      VkDeviceMemory textureImageMemory;
       VkRenderPass renderPass;
       VkPipeline graphicsPipeline;
       std::vector<VkFramebuffer> swapChainFramebuffers;
@@ -219,6 +223,7 @@ class Application {
         createUniformBuffers();
         createDescriptorPool();
         createDescriptorSets();
+        createTextureImage();
         createCommandBuffer();
         createSyncObjects();
 
@@ -936,6 +941,37 @@ void createUniformBuffers(){
         vkMapMemory(device , uniformBuffersMemory[i], 0 , bufferSize , 0 , &uniformBuffersMapped[i]);
     }
 }
+void createTextureImage(){
+    int texWidth , texHeight , texChannels;
+
+    // tell stb_image to read the file and force it to have an alpha channel
+    stbi_uc* pixels = stbi_load("texture.jpg", &texWidth, &texHeight, &texChannels,STBI_rgb_alpha);
+
+    //calculate the total size of image in bytes ( width * height x4 bytes)
+
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+    if(!pixels){
+        throw std::runtime_error("failed to load texture image");
+
+    }
+
+    // create temporary staging buffer
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(imageSize , VK_BUFFER_USAGE_TRANSFER_SRC_BIT ,VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |VK_MEMORY_PROPERTY_HOST_COHERENT_BIT , stagingBuffer , stagingBufferMemory);
+
+    //map memory and copy pixels into the staging buffer
+
+    void* data;
+     vkMapMemory(device , stagingBufferMemory , 0 , imageSize , 0 , &data);
+     memcpy(data , pixels , static_cast<size_t>(imageSize));
+     vkUnmapMemory(device , stagingBufferMemory);
+
+    // clean the original pixel array
+    stbi_image_free(pixels); 
+}
 
 void createDescriptorPool(){
     VkDescriptorPoolSize poolSize{};
@@ -993,11 +1029,11 @@ void updateUniformBuffer(uint32_t currentImage){
 
     UniformBufferObject ubo{};
     //model : spin it around Z axis
-    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f),glm::vec3(0.0f,0.0f,1.0f));
+    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f),glm::vec3(1.0f,0.0f,0.0f));
 
    //view :camera looking from x:2 , y:2, z:2 down towards the center(0,0,0)
 
-   ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f,0.0f,0.f) , glm::vec3(0.0f,0.0f,1.0f));
+   ubo.view = glm::lookAt(glm::vec3(1.0f, 2.0f, 1.0f), glm::vec3(0.0f,0.0f,0.f) , glm::vec3(0.0f,0.0f,1.0f));
 
    //projection 45 degree field of view
 
