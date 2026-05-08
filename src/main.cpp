@@ -1151,6 +1151,25 @@ void createTextureImage(){
 
     // clean the original pixel array
     stbi_image_free(pixels); 
+
+
+    // create image object and allocate its memory 
+    createImage(texWidth, texHeight,VK_FORMAT_B8G8R8A8_SRGB,VK_IMAGE_TILING_OPTIMAL,VK_IMAGE_USAGE_TRANSFER_DST_BIT,VK_IMAGE_USAGE_SAMPLED_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,textureImage,textureImageMemory);
+
+    //transition layout to prepare for the copy
+    transitionImageLayout(textureImage,VK_FORMAT_B8G8R8A8_SRGB,VK_IMAGE_LAYOUT_UNDEFINED,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    //execute copy from the staging buffer
+    copyBufferToImage(stagingBuffer,textureImage,static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+
+    //transition layout to prepare for shader reading 
+
+    transitionImageLayout(textureImage,VK_FORMAT_B8G8R8A8_SRGB,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    //cleanup the staging buffer
+
+    vkDestroyBuffer(device ,stagingBuffer,nullptr);
+    vkFreeMemory(device , stagingBufferMemory, nullptr);
 }
 
 void createTextureImageView(){
