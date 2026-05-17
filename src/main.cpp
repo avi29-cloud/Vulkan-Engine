@@ -53,8 +53,8 @@ struct Vertex{
         return bindingDescription;
     }
   //tells Vulkan how to extract the position and color from the memory chunk
-  static std::array<VkVertexInputAttributeDescription, 3=> getAttributeDescription(){ //changed the array size to upgrade the geometry 
-    std::array<VkVertexInputAttributeDescription,2> attributeDescriptions{};
+  static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescription(){ //changed the array size to upgrade the geometry 
+    std::array<VkVertexInputAttributeDescription,3> attributeDescriptions{};
 
     //Attribute 0 : Position (Matches 'layout(location = 0)' in the vertex shader)
     attributeDescriptions[0].binding = 0;
@@ -593,6 +593,18 @@ void createDescriptorSetLayout(){
 
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     uboLayoutBinding.pImmutableSamplers = nullptr;
+
+   // Sampler Binding
+    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+    samplerLayoutBinding.binding =1;
+    samplerLayoutBinding.descriptorCount=1;
+    samplerLayoutBinding.descriptorType =VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding.pImmutableSamplers = nullptr;
+   // the texture is used in the fragment shader to color the pixels
+    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings ={uboLayoutBinding,samplerLayoutBinding};//bundle them together
+   
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -1225,14 +1237,22 @@ void createTextureSampler(){  //Visual style of the texture
     }
 }
 void createDescriptorPool(){
-    VkDescriptorPoolSize poolSize{};
+   /* VkDescriptorPoolSize poolSize{};
     poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount = static_cast<uint32_t>(swapChainImages.size());
+    poolSize.descriptorCount = static_cast<uint32_t>(swapChainImages.size());*/ //Old 
+
+    // we now need a pool for UBOs and a pool for image samplers
+    std::array<VkDescriptorPoolSize, 2> poolSizes{};
+    poolSizes[0].type= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
+
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = 1;
-    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.pPoolSizes = poolSizes.data();
     poolInfo.maxSets = static_cast<uint32_t>(swapChainImages.size());
 
     if (vkCreateDescriptorPool(device , &poolInfo , nullptr , &descriptorPool)!= VK_SUCCESS){
@@ -1255,21 +1275,51 @@ void createDescriptorSets(){
 
 
     for(size_t i = 0; i< swapChainImages.size(); i++){
+        // Connection 1 :The uniform buffer
         VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.buffer = uniformBuffers[i];
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(UniformBufferObject);
 
-        VkWriteDescriptorSet descriptorWrite{};
+        /*VkWriteDescriptorSet descriptorWrite{};
         descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrite.dstSet = descriptorSets[i];
         descriptorWrite.dstBinding = 0;
         descriptorWrite.dstArrayElement = 0;
         descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrite.descriptorCount = 1;
-        descriptorWrite.pBufferInfo = &bufferInfo;
+        descriptorWrite.pBufferInfo = &bufferInfo;*/
+        
+        //connection 2 : The texture Image and sampler 
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView =textureImageView;
+        imageInfo.sampler = textureSampler;
 
-        vkUpdateDescriptorSets(device , 1 , &descriptorWrite , 0 , nullptr);
+        std::array<VkWriteDescriptorSet , 2> descriptorWrites{};
+
+        //plug in The UBO at binding 0
+        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = descriptorSets[i];
+        descriptorWrites[0].dstBinding =0;
+        descriptorWrites[0].dstArrayElement = 0;
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+      //plug in the texture at binding 1
+      descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      descriptorWrites[1].dstSet = descriptorSets[i];
+      descriptorWrites[1].dstBinding =1;
+      descriptorWrites[1].dstArrayElement =0;
+      descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+      descriptorWrites[1].descriptorCount = 1;
+      descriptorWrites[1].pImageInfo = &imageInfo;
+
+       // vkUpdateDescriptorSets(device , 1 , &descriptorWrite , 0 , nullptr); old
+
+       //send both connections to gpu at once
+       vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()),descriptorWrites.data(), 0, nullptr);
     }
 }
 
