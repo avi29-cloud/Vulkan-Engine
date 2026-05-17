@@ -233,11 +233,11 @@ class Application {
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
-        createDescriptorPool();
-        createDescriptorSets();
-        createTextureImage();
+        createTextureImage(); // rearranged the messed up order (which caused the error)
         createTextureImageView();
         createTextureSampler();
+        createDescriptorPool();
+        createDescriptorSets();
         createCommandBuffer();
         createSyncObjects();
 
@@ -608,8 +608,8 @@ void createDescriptorSetLayout(){
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 1;
-    layoutInfo.pBindings = &uboLayoutBinding;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
 
     if (vkCreateDescriptorSetLayout(device , &layoutInfo , nullptr , &descriptorSetLayout) != VK_SUCCESS){
         throw std::runtime_error("failed to create descriptor set layout !");
@@ -1176,17 +1176,17 @@ void createTextureImage(){
 
 
     // create image object and allocate its memory 
-    createImage(texWidth, texHeight,VK_FORMAT_B8G8R8A8_SRGB,VK_IMAGE_TILING_OPTIMAL,VK_IMAGE_USAGE_TRANSFER_DST_BIT |VK_IMAGE_USAGE_SAMPLED_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,textureImage,textureImageMemory);
+    createImage(texWidth, texHeight,VK_FORMAT_R8G8B8A8_SRGB,VK_IMAGE_TILING_OPTIMAL,VK_IMAGE_USAGE_TRANSFER_DST_BIT |VK_IMAGE_USAGE_SAMPLED_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,textureImage,textureImageMemory);
 
     //transition layout to prepare for the copy
-    transitionImageLayout(textureImage,VK_FORMAT_B8G8R8A8_SRGB,VK_IMAGE_LAYOUT_UNDEFINED,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    transitionImageLayout(textureImage,VK_FORMAT_R8G8B8A8_SRGB,VK_IMAGE_LAYOUT_UNDEFINED,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     //execute copy from the staging buffer
     copyBufferToImage(stagingBuffer,textureImage,static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
 
     //transition layout to prepare for shader reading 
 
-    transitionImageLayout(textureImage,VK_FORMAT_B8G8R8A8_SRGB,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    transitionImageLayout(textureImage,VK_FORMAT_R8G8B8A8_SRGB,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     //cleanup the staging buffer
 
