@@ -24,9 +24,8 @@ Make sure `texture.jpg`, `vert.spv`, and `frag.spv` are in the same directory as
 
 ## What it does right now
 
-Renders a colored rectangle that rotates over time. Camera is set up with a perspective projection, and the rotation is driven by a UBO updated every frame using `std::chrono`. The four corners are red, green, blue, and white.
+Renders a fully textured 3D rectangle that rotates over time .The camera is set up with a perspective projection , and the rotation is driven by a UBO updated every frame using std::chrono. The texture is mapped using UV coordinates and sampled directly using UV coordinates and sampled directly by the GPU in the fragment shader
 
-Texturing infrastructure is partially in place (image view + sampler are created) but the texture isn't actually mapped onto the geometry yet — that's the next step.
 
 ---
 
@@ -49,6 +48,7 @@ Texturing infrastructure is partially in place (image view + sampler are created
 - Single color attachment, clears to black each frame
 - Full fixed-function config: triangle list topology, fill mode, counter-clockwise winding, dynamic viewport/scissor, no blending
 - Shaders loaded from compiled SPIR-V at runtime
+- `Vertex` struct upgraded to include UV coordinates (location 2)
 
 ### Buffers
 - Vertex and index buffers both use the staging buffer pattern (CPU writes to host-visible, GPU copies to device-local)
@@ -57,13 +57,14 @@ Texturing infrastructure is partially in place (image view + sampler are created
 ### Uniform Buffers + Descriptors
 - `UniformBufferObject` holds model/view/proj matrices
 - One UBO per swapchain image, persistently mapped
-- Descriptor set layout, pool, and sets all wired up
+- Descriptor Pool upgraded to allocate space for both UBOs and Combined Image Samplers
+-Descriptor Sets wired up to Bindings 0(UBO) and binding 1(Texture sampler)
 
 ### Textures (partial)
 - `stb_image` loads the image and copies pixels into a staging buffer
-- Image view and sampler are created
-- Still need: actual `VkImage` creation, memory binding, and layout transition (`transitionImageLayout`)
-
+- `VkImage` created with `VK_IMAGE_TILING_OPTIMAL` and bound to `DEVICE_LOCAL` memory
+-Command buffers dynamically transition layout to `TRANSFER_DST_OPTIMAL` , copy the buffer, and transition to `SHADER_READ_ONLY_OPTIMAL` 
+-Image view and sampler are created with Linear filtering and Repeat wrapping mode
 ---
 
 ## Notes to self
@@ -71,3 +72,4 @@ Texturing infrastructure is partially in place (image view + sampler are created
 - The GPU scoring/selection approach (commented out in `pickPhysicalDevice`) is the "proper" way for real apps — scores by device type and max texture size
 - `VK_CULL_MODE_NONE` is set for now since the geometry is flat and winding order doesn't matter yet
 - Anisotropic filtering is disabled in the sampler — easy to enable later by querying device features
+- Texture Format Mismatch :standard JPEGs read via `stb_image` load in `R8G8B8A8` format , which is different from Swapchain's `B8G8R8A8`.Ensures the `VkImage` matches the image library , not the monitor 
