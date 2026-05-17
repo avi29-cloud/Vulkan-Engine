@@ -41,6 +41,9 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 struct Vertex{
     glm::vec2 pos;
     glm::vec3 color;
+    glm::vec2 texCoord; 
+
+
     //tells vulkan how much memory to step forward for each new vertex
     static VkVertexInputBindingDescription getBindingDescription(){
         VkVertexInputBindingDescription bindingDescription{};
@@ -50,7 +53,7 @@ struct Vertex{
         return bindingDescription;
     }
   //tells Vulkan how to extract the position and color from the memory chunk
-  static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescription(){
+  static std::array<VkVertexInputAttributeDescription, 3=> getAttributeDescription(){ //changed the array size to upgrade the geometry 
     std::array<VkVertexInputAttributeDescription,2> attributeDescriptions{};
 
     //Attribute 0 : Position (Matches 'layout(location = 0)' in the vertex shader)
@@ -64,17 +67,24 @@ struct Vertex{
     attributeDescriptions[1].location = 1;
     attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT ;// a 3D float vector
     attributeDescriptions[1].offset = offsetof(Vertex, color);
-
+ 
+    //Attribute 2 : Texture coordinates (UVs)
+    attributeDescriptions[2].binding =0;
+    attributeDescriptions[2].location = 2;//matches layout (location 2) in shader
+    attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+    attributeDescriptions[2].offset = offsetof(Vertex , texCoord);
     return attributeDescriptions;
   }
     
 };
 
 const std::vector<Vertex> vertices ={
-    {{-0.5f,-0.5f},{1.0f,0.0f, 0.0f}},//top left
-    {{0.5f,-0.5f}, {0.0f,1.0f,0.0f}},//top right
-    {{0.5f,0.5f},  {0.0f,0.0f,1.0f}},//bottom right
-    {{-0.5f,0.5f}, {1.0f,1.0f,1.0f}} // bottom left
+
+     // Position     //color           //TexCoord(UV)
+    {{-0.5f,-0.5f},{1.0f,0.0f, 0.0f}, {0.0f, 0.0f}}, //top left
+    {{0.5f,-0.5f}, {0.0f,1.0f,0.0f},  {1.0f, 0.0f}}, //top right
+    {{0.5f,0.5f},  {0.0f,0.0f,1.0f},  {1.0f ,1.0f}},  //bottom right
+    {{-0.5f,0.5f}, {1.0f,1.0f,1.0f},  {0.0f, 1.0f}}  // bottom left
 };
 
 const std::vector<uint16_t> indices = {
@@ -1154,7 +1164,7 @@ void createTextureImage(){
 
 
     // create image object and allocate its memory 
-    createImage(texWidth, texHeight,VK_FORMAT_B8G8R8A8_SRGB,VK_IMAGE_TILING_OPTIMAL,VK_IMAGE_USAGE_TRANSFER_DST_BIT,VK_IMAGE_USAGE_SAMPLED_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,textureImage,textureImageMemory);
+    createImage(texWidth, texHeight,VK_FORMAT_B8G8R8A8_SRGB,VK_IMAGE_TILING_OPTIMAL,VK_IMAGE_USAGE_TRANSFER_DST_BIT |VK_IMAGE_USAGE_SAMPLED_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,textureImage,textureImageMemory);
 
     //transition layout to prepare for the copy
     transitionImageLayout(textureImage,VK_FORMAT_B8G8R8A8_SRGB,VK_IMAGE_LAYOUT_UNDEFINED,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -1638,4 +1648,4 @@ int main(){
     return EXIT_FAILURE;
  }
  return EXIT_SUCCESS;
-};
+}
