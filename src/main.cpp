@@ -157,6 +157,9 @@ class Application {
       VkDeviceMemory vertexBufferMemory;
       VkBuffer indexBuffer;
       VkDeviceMemory indexBufferMemory;
+      VkImage depthImage;
+      VkDeviceMemory depthImageMemory;
+      VkImageView depthImageView;
 
      struct QueueFamilyIndices{
         std::optional<uint32_t> graphicsFamily;
@@ -217,6 +220,28 @@ class Application {
         }
 
     }
+    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling , VkFormatFeatureFlags features){
+        for (VkFormat format : candidates){
+            VkFormatProperties props;
+            vkGetPhysicalDeviceFormatProperties(physicalDevice,format, &props);
+
+            if (tiling ==VK_IMAGE_TILING_LINEAR &&(props.linearTilingFeatures & features)== features){
+                return format;
+            }
+            else if (tiling ==VK_IMAGE_TILING_OPTIMAL &&(props.optimalTilingFeatures & features)== features){
+                return format;
+            }
+        }
+           
+            throw std::runtime_error("failed to find supported format");
+    }
+
+    VkFormat findDepthFormat(){
+        return findSupportedFormat(
+            {VK_FORMAT_D32_SFLOAT , VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    }
     void initVulkan(){
         createInstance();
         setupDebugMessenger();
@@ -228,6 +253,7 @@ class Application {
         createRenderPass();
         createDescriptorSetLayout();
         createGraphicsPipeline();
+        createDepthResources();
         createFramebuffers();
         createCommandPool();
         createVertexBuffer();
@@ -561,7 +587,7 @@ void createImageViews(){
     swapChainImageViews.resize(swapChainImages.size());
 
     for (size_t i =0; i<swapChainImages.size();i++){
-        VkImageViewCreateInfo createInfo{};
+        /*VkImageViewCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         createInfo.image = swapChainImages[i];
 
@@ -579,9 +605,12 @@ void createImageViews(){
         createInfo.subresourceRange.baseArrayLayer=0;
         createInfo.subresourceRange.layerCount =1;
 
+
         if (vkCreateImageView(device, &createInfo ,nullptr, &swapChainImageViews[i]) != VK_SUCCESS){
             std::runtime_error("failed to create image views");
-        }
+        }*/  // old loop 
+
+        swapChainImageViews[i] = createImageView(swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
     }
 }
 void createDescriptorSetLayout(){
@@ -1196,7 +1225,14 @@ void createTextureImage(){
 }
 
 void createTextureImageView(){
-    textureImageView =createImageView(textureImage , VK_FORMAT_R8G8B8A8_SRGB);
+    textureImageView =createImageView(textureImage , VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
+}
+void createDepthResources(){
+    VkFormat depthFormat = findDepthFormat();
+    //VkExtent2D swapChainExtent = swapChainExtent(querySwapChainSupport(physicalDevice));
+    createImage(swapChainExtent.width, swapChainExtent.height , depthFormat , VK_IMAGE_TILING_OPTIMAL,VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,depthImage,depthImageMemory);
+
+    depthImageView = createImageView(depthImage , depthFormat , VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
 void createTextureSampler(){  //Visual style of the texture 
@@ -1640,6 +1676,7 @@ void createInstance(){
 
     }
 
+
     void cleanup(){
 
         for (auto framebuffer : swapChainFramebuffers){
@@ -1676,6 +1713,9 @@ void createInstance(){
         vkDestroyRenderPass(device, renderPass, nullptr);
         vkDestroySwapchainKHR(device, swapChain, nullptr);
         vkDestroyDevice(device, nullptr);
+        vkDestroyImageView(device , depthImageView , nullptr);
+        vkFreeMemory(device , depthImageMemory , nullptr);
+        vkDestroyImage(device , depthImage , nullptr);
         if (enableValidationLayers){
             DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
         }
@@ -1685,7 +1725,7 @@ void createInstance(){
         glfwTerminate();//terminating glfw
 
     }
-    
+
 };
 
 
