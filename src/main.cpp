@@ -806,6 +806,14 @@ void createGraphicsPipeline(){
     colorBlending.attachmentCount =1;
     colorBlending.pAttachments = &colorBlendAttachment;
 
+    VkPipelineDepthStencilStateCreateInfo depthStencil {};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE; // allow the pipeline to write to the depth buffer
+    depthStencil.depthCompareOp =VK_COMAPRE_OP_LESS; //"lower" depth means "closer to camera"
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
+
    //Pipeline Layout (for passing global variable to the shaders later)
    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -832,7 +840,8 @@ void createGraphicsPipeline(){
  pipelineInfo.pViewportState = &viewportState;
  pipelineInfo.pRasterizationState = &rasterizer;
  pipelineInfo.pMultisampleState =&multisampling;
- pipelineInfo.pDepthStencilState = nullptr;
+ //pipelineInfo.pDepthStencilState = nullptr;
+ pipelineInfo.pDepthStencilState = &depthStencil;
  pipelineInfo.pColorBlendState = &colorBlending; 
  pipelineInfo.pDynamicState = &dynamicState;
 
@@ -859,9 +868,15 @@ void createFramebuffers(){
     swapChainFramebuffers.resize(swapChainImageViews.size());
 
     for (size_t i = 0; i< swapChainImageViews.size();i++){
-        VkImageView attachments[]={
+       /* VkImageView attachments[]={
             swapChainImageViews[i]
-        };
+        };*/
+
+        // New array of 2 attachments 
+        std::array<VkImageView ,2> attachments ={
+            swapChainImageViews[i], // col;or
+            depthImageView //Depth (same depth buffer used for every frame )
+        }
 
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType =VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -1459,9 +1474,11 @@ void updateUniformBuffer(uint32_t currentImage){
     renderPassInfo.renderArea.extent = swapChainExtent;
 
     //Set background color to black
-    VkClearValue clearColor = {{{0.0f,0.0f,0.0f,1.0f}}};
+
+   /* VkClearValue clearColor = {{{0.0f,0.0f,0.0f,1.0f}}};
     renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues = &clearColor;
+    renderPassInfo.pClearValues = &clearColor;*/ 
+   
 
     //this is a command being written to the buffer , not executed immediately
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
