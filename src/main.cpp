@@ -667,12 +667,16 @@ void createRenderPass(){
         VkAttachmentDescription depthAttachment{};
         depthAttachment.format = findDepthFormat();
         depthAttachment.samples =VK_SAMPLE_COUNT_1_BIT;
-        depthAttachment.loadOP = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE // we dont need to save the depth data after drawing 
+        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE ;// we dont need to save the depth data after drawing 
         depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentReference depthAttachmentRef{};
+        depthAttachmentRef.attachment =1;
+        depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         
         // 3) The Subpass (A render pass can have multiple steps; we just need one)
         VkSubpassDescription subpass{};
@@ -695,8 +699,8 @@ void createRenderPass(){
       std::array<VkAttachmentDescription , 2> attachments = {colorAttachment , depthAttachment };
         VkRenderPassCreateInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        renderPassInfo.attachmentCount = 1;
-        renderPassInfo.pAttachments = &colorAttachment;
+        renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        renderPassInfo.pAttachments = attachments.data();
         renderPassInfo.subpassCount =1;
         renderPassInfo.pSubpasses = &subpass;
         renderPassInfo.dependencyCount = 1;
@@ -810,7 +814,7 @@ void createGraphicsPipeline(){
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = VK_TRUE;
     depthStencil.depthWriteEnable = VK_TRUE; // allow the pipeline to write to the depth buffer
-    depthStencil.depthCompareOp =VK_COMAPRE_OP_LESS; //"lower" depth means "closer to camera"
+    depthStencil.depthCompareOp =VK_COMPARE_OP_LESS; //"lower" depth means "closer to camera"
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 
@@ -876,13 +880,13 @@ void createFramebuffers(){
         std::array<VkImageView ,2> attachments ={
             swapChainImageViews[i], // col;or
             depthImageView //Depth (same depth buffer used for every frame )
-        }
+        };
 
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType =VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = renderPass; // tell it which manager to use
-        framebufferInfo.attachmentCount = 1;
-        framebufferInfo.pAttachments = attachments; //Plug in the image view
+        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        framebufferInfo.pAttachments = attachments.data(); //Plug in the image view
         framebufferInfo.width = swapChainExtent.width;
         framebufferInfo.height = swapChainExtent.height;
         framebufferInfo.layers = 1;
@@ -1330,7 +1334,7 @@ void createDescriptorPool(){
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 1;
+    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
     poolInfo.maxSets = static_cast<uint32_t>(swapChainImages.size());
 
@@ -1477,7 +1481,15 @@ void updateUniformBuffer(uint32_t currentImage){
 
    /* VkClearValue clearColor = {{{0.0f,0.0f,0.0f,1.0f}}};
     renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues = &clearColor;*/ 
+    renderPassInfo.pClearValues = &clearColor;*/ //old
+
+    // clear value for color and clear value for depth
+    std::array<VkClearValue, 2> clearValues{};
+    clearValues[0].color = {{0.0f,0.0f,0.0f,1.0f}};
+    clearValues[1].depthStencil = {1.0f,0}; // 1 is absolute furthest depth
+    
+    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    renderPassInfo.pClearValues = clearValues.data();
    
 
     //this is a command being written to the buffer , not executed immediately
