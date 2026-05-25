@@ -21,6 +21,9 @@
 #include<limits>
 #include<cstdint>
 #include<fstream>
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+#include <unordered_map> // for vertex deduplication
 
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger){
     auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
@@ -39,10 +42,13 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
     }
 }
 struct Vertex{
-    glm::vec2 pos;
+    glm::vec3 pos; // changed vec2 to vec3 for 3D coordinates
     glm::vec3 color;
     glm::vec2 texCoord; 
 
+    bool operator == (const Vertex& other) const{
+        return pos == other.pos && color == other.color && texCoord == other.texCoord;}
+    
 
     //tells vulkan how much memory to step forward for each new vertex
     static VkVertexInputBindingDescription getBindingDescription(){
@@ -59,7 +65,8 @@ struct Vertex{
     //Attribute 0 : Position (Matches 'layout(location = 0)' in the vertex shader)
     attributeDescriptions[0].binding = 0;
     attributeDescriptions[0].location = 0;
-    attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT ;// a 2D float vector
+  //attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT ;// a 2D float vector
+    attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT ;// position now has 3 floats :x,y,z
     attributeDescriptions[0].offset = offsetof(Vertex, pos);
 
     //Attribute 1: Color(Matches 'layout(location = 1)' in the vertex shader)
@@ -78,7 +85,17 @@ struct Vertex{
     
 };
 
-const std::vector<Vertex> vertices ={
+namespace std{
+    template<> struct hash<Vertex>{
+        size_t operator()(Vertex const& vertex) const{
+            return ((hash<glm::vec3>()(vertex.pos)^
+                     (hash<glm::vec3()(vertex.color)<<1))>>1)^
+                     (hash<glm::vec2()(vertex.texCoord)<<1);
+        }
+    };
+}
+
+/*const std::vector<Vertex> vertices ={
 
      // Position     //color           //TexCoord(UV)
     {{-0.5f,-0.5f},{1.0f,0.0f, 0.0f}, {0.0f, 0.0f}}, //top left
@@ -90,7 +107,8 @@ const std::vector<Vertex> vertices ={
 const std::vector<uint16_t> indices = {
     0,1,2, 
     2,3,0
-};
+};*/  
+
 struct UniformBufferObject {
     glm::mat4 model;
     glm::mat4 view;
@@ -160,6 +178,8 @@ class Application {
       VkImage depthImage;
       VkDeviceMemory depthImageMemory;
       VkImageView depthImageView;
+      std::vector<Vertex> vertices;
+      std::vector<uint32_t> indices; // upgraded from 16 to 32 because 3D
 
      struct QueueFamilyIndices{
         std::optional<uint32_t> graphicsFamily;
@@ -1502,7 +1522,8 @@ void updateUniformBuffer(uint32_t currentImage){
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(commandBuffer, 0 , 1 , vertexBuffers, offsets);
     
-    vkCmdBindIndexBuffer(commandBuffer, indexBuffer , 0 , VK_INDEX_TYPE_UINT16);
+  //vkCmdBindIndexBuffer(commandBuffer, indexBuffer , 0 , VK_INDEX_TYPE_UINT16);
+    vkCmdBindIndexBuffer(commandBuffer, indexBuffer , 0 , VK_INDEX_TYPE_UINT32);//same reason 3D
     
     vkCmdBindDescriptorSets(commandBuffer , VK_PIPELINE_BIND_POINT_GRAPHICS , pipelineLayout , 0, 1 , &descriptorSets[imageIndex],0,nullptr);
 
