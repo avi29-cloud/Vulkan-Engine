@@ -24,6 +24,8 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 #include <unordered_map> // for vertex deduplication
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
 
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger){
     auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
@@ -88,9 +90,9 @@ struct Vertex{
 namespace std{
     template<> struct hash<Vertex>{
         size_t operator()(Vertex const& vertex) const{
-            return ((hash<glm::vec3>()(vertex.pos)^
-                     (hash<glm::vec3()(vertex.color)<<1))>>1)^
-                     (hash<glm::vec2()(vertex.texCoord)<<1);
+            return ((hash<glm::vec3>()(vertex.pos) ^
+                   (hash<glm::vec3>()(vertex.color)<<1))>>1)^
+                   (hash<glm::vec2>()(vertex.texCoord)<<1);
         }
     };
 }
@@ -276,6 +278,7 @@ class Application {
         createDepthResources();
         createFramebuffers();
         createCommandPool();
+        loadModel();
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
@@ -1145,6 +1148,45 @@ uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties){
     );
     endsingleTimeCommands(commandBuffer);
  }
+ void loadModel(){
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string warn , err;
+    if (!tinyobj::LoadObj(&attrib , &shapes, &materials ,&warn , &err , "viking_room.obj")){
+        throw std::runtime_error(warn+ err);
+    }
+
+    std::unordered_map<Vertex , uint32_t> uniqueVertices{};
+
+    for (const auto& shape : shapes){
+        for (const auto& index : shape.mesh.indices ){
+            Vertex vertex{};
+            //extract 3D position
+            vertex.pos={
+                attrib.vertices[3*index.vertex_index +0],
+                attrib.vertices[3*index.vertex_index +1],
+                attrib.vertices[3*index.vertex_index +2]
+            };
+            //extract UV coordinates (and flip Y axis)
+            vertex.texCoord ={
+                attrib.texcoords[2*index.texcoord_index +0],
+                1.0f - attrib.texcoords[2*index.texcoord_index +1]
+            };
+
+            //default color 
+            vertex.color ={1.0f , 1.0f , 1.0f};
+
+            // deduplicate vertices using hash map
+            if (uniqueVertices.count(vertex) ==0){
+                uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+                vertices.push_back(vertex);
+            }
+            indices.push_back(uniqueVertices[vertex]);
+        }
+    }
+
+ }
 void createVertexBuffer(){
  
     VkDeviceSize bufferSize = sizeof(vertices[0])* vertices.size();
@@ -1243,7 +1285,7 @@ void createTextureImage(){
     int texWidth , texHeight , texChannels;
 
     // tell stb_image to read the file and force it to have an alpha channel
-    stbi_uc* pixels = stbi_load("texture.jpg", &texWidth, &texHeight, &texChannels,STBI_rgb_alpha);
+    stbi_uc* pixels = stbi_load("viking_room.png", &texWidth, &texHeight, &texChannels,STBI_rgb_alpha);
 
     //calculate the total size of image in bytes ( width * height x4 bytes)
 
@@ -1433,7 +1475,7 @@ void updateUniformBuffer(uint32_t currentImage){
 
     UniformBufferObject ubo{};
     //model : spin it around Z axis
-    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f),glm::vec3(1.0f,0.0f,0.0f));
+    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f),glm::vec3(0.0f,0.0f,1.0f));
 
    //view :camera looking from x:2 , y:2, z:2 down towards the center(0,0,0)
 
