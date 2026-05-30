@@ -1046,7 +1046,7 @@ uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties){
     imageInfo.extent.height = height ;
     imageInfo.extent.depth = 1;
     imageInfo.mipLevels = mipLevels;
-    imageInfo.mipLevels = 1;
+   // imageInfo.mipLevels = 1;
     imageInfo.arrayLayers = 1;
     imageInfo.format = format;
     imageInfo.tiling = tiling ; 
@@ -1198,7 +1198,7 @@ uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties){
         blit.dstSubresource.layerCount =1;
 
        //Command to shrink the image 
-        vkCmdBlitImage (commandBuffer , image , VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,image ,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1 ,&blit, VK_FILTER_LINEAR);
+        vkCmdBlitImage (commandBuffer , image , VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,image ,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1 ,&blit, VK_FILTER_LINEAR); 
         barrier.oldLayout =VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
         barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barrier.srcAccessMask =VK_ACCESS_TRANSFER_READ_BIT;
@@ -1207,7 +1207,7 @@ uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties){
         vkCmdPipelineBarrier(commandBuffer ,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,0,0,nullptr,0,nullptr, 1 , &barrier);
 
         if (mipWidth >1 ) mipWidth /= 2;
-        if (mipHeight>1 ) mipHeight /= 2;
+        if (mipHeight>1 ) mipHeight /= 2;}
 
         barrier.subresourceRange.baseMipLevel = mipLevels -1 ;
         barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -1218,7 +1218,7 @@ uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties){
         vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,0,0,nullptr,0,nullptr ,1 ,&barrier);
 
         endsingleTimeCommands(commandBuffer);
-    }
+    
  }
  void loadModel(){
     tinyobj::attrib_t attrib;
@@ -1388,7 +1388,7 @@ void createTextureImage(){
 
 
     // create image object and allocate its memory 
-    createImage(texWidth, texHeight,VK_IMAGE_USAGE_TRANSFER_SRC_BIT,VK_FORMAT_R8G8B8A8_SRGB,VK_IMAGE_TILING_OPTIMAL,VK_IMAGE_USAGE_TRANSFER_DST_BIT |VK_IMAGE_USAGE_SAMPLED_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,textureImage,textureImageMemory );
+    createImage(texWidth, texHeight,mipLevels,VK_FORMAT_R8G8B8A8_SRGB,VK_IMAGE_TILING_OPTIMAL,VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT |VK_IMAGE_USAGE_SAMPLED_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,textureImage,textureImageMemory );
 
     //transition layout to prepare for the copy
     transitionImageLayout(textureImage,VK_FORMAT_R8G8B8A8_SRGB,VK_IMAGE_LAYOUT_UNDEFINED,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,mipLevels);
@@ -1451,7 +1451,7 @@ void createTextureSampler(){  //Visual style of the texture
 
     samplerInfo.mipLodBias = 0.0f;
     samplerInfo.minLod =0.0f;
-    samplerInfo.maxLod =0.0f;
+    samplerInfo.maxLod = static_cast<float>(mipLevels);
 
     if (vkCreateSampler(device , &samplerInfo , nullptr ,&textureSampler)!= VK_SUCCESS){
         throw std:: runtime_error("failed to create texture sampler");
@@ -1553,9 +1553,13 @@ void updateUniformBuffer(uint32_t currentImage){
     //model : spin it around Z axis
     ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f),glm::vec3(0.0f,0.0f,1.0f));
 
-   //view :camera looking from x:2 , y:2, z:2 down towards the center(0,0,0)
+  /* //view :camera looking from x:2 , y:2, z:2 down towards the center(0,0,0)
 
-   ubo.view = glm::lookAt(glm::vec3(1.0f, 2.0f, 1.0f), glm::vec3(0.0f,0.0f,0.f) , glm::vec3(0.0f,0.0f,1.0f));
+   ubo.view = glm::lookAt(glm::vec3(1.0f, 2.0f, 1.0f), glm::vec3(0.0f,0.0f,0.f) , glm::vec3(0.0f,0.0f,1.0f));*/
+
+   //camera distance smoothly ping pong 1 to 8 units away to check the mipmapping
+   float camDist = 4.5f +3.5f *std::sin(time * 2.0f);
+   ubo.view =glm ::lookAt(glm::vec3(camDist , camDist, camDist*0.5f),glm::vec3(0.0f, 0.0f,0.0f),glm::vec3(0.0f,0.0f,1.0f));
 
    //projection 45 degree field of view
 
